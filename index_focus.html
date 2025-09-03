@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>語詞練習（專注版）</title>
+  <style>
+    :root { --gap: 14px; --radius: 16px; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: #f7f7f8;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", Arial, sans-serif;
+      color: #0f172a; display:flex; align-items:center; justify-content:center;
+    }
+    .app {
+      width: min(920px, 92vw); background: #fff; border-radius: var(--radius);
+      box-shadow: 0 10px 30px rgba(2,6,23,.08); padding: clamp(16px, 3vw, 28px);
+    }
+    .top {
+      display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: clamp(10px, 2vw, 16px);
+    }
+    .badge { font-size: 14px; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 999px; background:#f8fafc; }
+    .score { font-size: 14px; color:#334155; }
+    .word {
+      font-size: clamp(36px, 6vw, 60px); text-align:center; padding: clamp(10px, 3vw, 20px) 8px;
+      border-radius: 12px; border: 1px dashed #e5e7eb; background: #fcfcfd; min-height: 1.6em;
+    }
+    .hint {
+      text-align:center; color:#64748b; font-size: clamp(14px, 2.5vw, 16px); margin-top: 8px; min-height: 22px;
+    }
+    .controls {
+      display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: clamp(16px, 3vw, 22px);
+    }
+    .btn {
+      font-size: clamp(16px, 2.5vw, 18px); padding: clamp(12px, 2.8vw, 16px);
+      border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer;
+      transition: transform .02s ease, background .2s ease;
+      user-select: none;
+    }
+    .btn:active { transform: scale(.98); }
+    .primary { background: #0ea5e9; color: #fff; border-color:#0ea5e9; }
+    .ghost { background: #fff; }
+    .danger { background: #ef4444; color:#fff; border-color:#ef4444; }
+    .muted { color:#64748b; }
+    .ok { color:#16a34a; }
+    .bad{ color:#dc2626; }
+    .bar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: 8px;}
+    .left { display:flex; align-items:center; gap:10px; }
+    .small { font-size: 13px; color:#6b7280; }
+    .dotmenu { width:40px; height:40px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; }
+    .remain { font-size: 13px; color:#64748b; }
+    /* dialog */
+    dialog { width:min(900px, 92vw); border:none; border-radius: 16px; padding: 0; }
+    .dlg { padding: 18px; }
+    .dlg h2 { margin:0 0 8px; font-size: 18px; }
+    .dlg .row { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin: 10px 0; }
+    input[type="text"] { padding:10px 12px; border:1px solid #e5e7eb; border-radius:12px; font-size:14px; }
+    textarea { width:100%; min-height: 90px; border:1px solid #e5e7eb; border-radius:12px; padding:10px; font-size:14px; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid #e5e7eb; border-radius:999px; background:#f8fafc; cursor:pointer; }
+    .pill + .pill { margin-left: 8px; }
+    .sec { border-top:1px solid #eef2f7; padding-top: 12px; margin-top: 12px; }
+    .close { position:absolute; right:10px; top:10px; width:40px; height:40px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; }
+    details { border:1px solid #eef2f7; border-radius:12px; padding: 8px 12px; margin-bottom:10px; }
+    summary { cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="bar">
+      <div class="left">
+        <button id="bankBtn" class="badge">題庫：未選擇</button>
+        <span class="remain">剩餘：<b id="remaining">0</b></span>
+      </div>
+      <div class="score" id="score">通過率：0/0（0%）</div>
+    </div>
+
+    <div class="word" id="word">請選擇題庫</div>
+    <div class="hint" id="hint">按下「開始」後清楚念出詞語</div>
+
+    <div class="controls">
+      <button id="startBtn" class="btn primary">開始</button>
+      <button id="nextBtn"  class="btn ghost">下一題</button>
+      <button id="moreBtn"  class="btn ghost">⋯</button>
+    </div>
+  </div>
+
+  <!-- 管理/選擇 題庫 dialog -->
+  <dialog id="bankDlg">
+    <div class="dlg">
+      <button class="close" id="dlgClose">✕</button>
+      <h2>選擇或管理題庫</h2>
+      <div class="row small">點選下方題庫即可切換；可改名、編輯內容或新增題庫。資料儲存在本機瀏覽器。</div>
+      <div id="bankPills" class="row"></div>
+
+      <div class="sec">
+        <h2>題庫內容</h2>
+        <div class="row">
+          <input type="text" id="bankNameInput" placeholder="題庫名稱" />
+          <button id="saveNameBtn" class="btn ghost">儲存名稱</button>
+          <button id="deleteBankBtn" class="btn danger">刪除此題庫</button>
+        </div>
+        <textarea id="bankText"></textarea>
+        <div class="row">
+          <button id="saveBankBtn" class="btn primary">儲存內容</button>
+          <button id="resetBankBtn" class="btn ghost">載入預設（若有）</button>
+          <span class="small">以空白、逗號或換行分隔</span>
+        </div>
+      </div>
+
+      <div class="sec">
+        <h2>新增題庫</h2>
+        <div class="row">
+          <input id="newBankName" type="text" placeholder="新題庫名稱（例如：G5L1 或 社會技巧A）" />
+          <button id="addBankBtn" class="btn primary">新增</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 更多選項 dialog -->
+  <dialog id="moreDlg">
+    <div class="dlg">
+      <button class="close" id="moreClose">✕</button>
+      <h2>更多</h2>
+      <div class="row">
+        <button id="reshuffleBtn" class="btn ghost">重排本輪</button>
+        <button id="resetProgressBtn" class="btn ghost">重置進度</button>
+        <button id="resetScoreBtn" class="btn danger">清空分數</button>
+      </div>
+      <div class="small">說明：重排會重新洗牌；重置進度會從當前題庫重新開始；清空分數只影響目前題庫。</div>
+    </div>
+  </dialog>
+
+  <script>
+    // ======== 預設題庫與名稱 ========
+    const DEFAULT_BANKS = {
+      b1: ["憂愁","禮讓","載人","灑水","小舟","文字","學習","練習","相似","口訣","忌妒","嘆氣"],
+      b2: ["耳朵","溜冰","一串","水珠","青蛙","游泳","煩惱","轉身","陀螺","緩慢","滑倒","老鷹"]
+    };
+    const DEFAULT_NAMES = { b1: "G3L1", b2: "G4L1" };
+
+    // localStorage keys
+    const LS_BANKS = "speech_custom_banks_v2";
+    const LS_NAMES = "speech_custom_names_v2";
+    const LS_PROGRESS = "speech_progress_v2";
+    const LS_SCORES = "speech_scores_v2";
+
+    // ======== 狀態 ========
+    let BANKS = load(LS_BANKS, DEFAULT_BANKS);
+    let NAMES = load(LS_NAMES, DEFAULT_NAMES);
+    let SCORES = load(LS_SCORES, {});
+    let currentBankKey = null;
+    let currentBank = [];
+    let remaining = [];
+    let currentWord = "";
+    let listening = false;
+
+    // ======== 工具 ========
+    function save(key, obj){ localStorage.setItem(key, JSON.stringify(obj)); }
+    function load(key, fallback){ try{ const s=localStorage.getItem(key); return s? JSON.parse(s): JSON.parse(JSON.stringify(fallback)); }catch(e){ return JSON.parse(JSON.stringify(fallback)); } }
+    function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+    function splitWords(t){ return t.split(/[，,\u3000\s\n\r]+/).map(w=>w.trim()).filter(Boolean); }
+    function normalize(s){ return (s||"").replace(/[\u3000\s]/g,"").replace(/[。，．、；：？！…「」『』（）()【】《》〈〉“”"'`,.?!;:]/g,"").toLowerCase().trim(); }
+    function uuid(){ return "b" + Math.random().toString(36).slice(2,9); }
+
+    // ======== 畫面更新 ========
+    function updateTop(){
+      document.getElementById("bankBtn").textContent = "題庫：" + (currentBankKey ? (NAMES[currentBankKey]||currentBankKey) : "未選擇");
+      document.getElementById("remaining").textContent = remaining.length;
+      const sc = SCORES[currentBankKey] || {correct:0, attempts:0};
+      const pct = sc.attempts ? Math.round(sc.correct*100/sc.attempts) : 0;
+      document.getElementById("score").textContent = `通過率：${sc.correct}/${sc.attempts}（${pct}%）`;
+    }
+    function setHint(text, cls="muted"){
+      const el = document.getElementById("hint");
+      el.textContent = text; el.className = "hint " + cls;
+    }
+    function showWord(text){ document.getElementById("word").textContent = text; }
+
+    // ======== 題庫控制 ========
+    function setBank(key, fresh=true){
+      currentBankKey = key;
+      currentBank = (BANKS[key]||[]).slice();
+      if(fresh){ remaining = shuffle(currentBank.slice()); currentWord=""; }
+      nextWord();
+      save(LS_PROGRESS, { key: currentBankKey, remaining, currentWord });
+      updateTop();
+    }
+    function nextWord(){
+      if(!currentBankKey){ showWord("請選擇題庫"); setHint("按下「開始」後清楚念出詞語"); return; }
+      if(remaining.length===0){ showWord("已完成本輪"); setHint("按 ⋯ → 重排 或 重置進度"); return; }
+      currentWord = remaining.pop();
+      showWord("請說出：" + currentWord);
+      setHint("按「開始」後清楚念出詞語");
+      updateTop();
+      save(LS_PROGRESS, { key: currentBankKey, remaining, currentWord });
+    }
+
+    // ======== 語音辨識 ========
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+    if(!SpeechRecognition){ setHint("⚠️ 此瀏覽器不支援語音辨識，請改用 Chrome/Edge。","bad"); }
+    else {
+      recognition.lang = "zh-TW"; recognition.interimResults = false; recognition.maxAlternatives = 1;
+      recognition.onstart = () => { listening = true; setHint("🎤 錄音中…請念出詞語"); document.getElementById("startBtn").textContent = "停止"; };
+      recognition.onresult = (e) => {
+        const raw = e.results[0][0].transcript || "";
+        const said = normalize(raw), target = normalize(currentWord);
+        if(!SCORES[currentBankKey]) SCORES[currentBankKey] = {correct:0, attempts:0};
+        SCORES[currentBankKey].attempts += 1;
+        if(said === target && target.length>0){
+          SCORES[currentBankKey].correct += 1;
+          setHint("✅ 答對了！","ok");
+          setTimeout(nextWord, 800);
+        } else {
+          setHint(`❌ 再試一次`,"bad");
+        }
+        save(LS_SCORES, SCORES);
+        updateTop();
+      };
+      recognition.onerror = (e) => { setHint("⚠️ 錯誤：" + e.error,"bad"); };
+      recognition.onend = () => { listening = false; document.getElementById("startBtn").textContent = "開始"; };
+    }
+
+    // ======== 事件 ========
+    document.getElementById("startBtn").addEventListener("click", ()=>{
+      if(!recognition) return;
+      if(!currentBankKey){ setHint("請先選擇題庫","bad"); return; }
+      if(listening){ try{ recognition.stop(); }catch(e){} }
+      else { try{ recognition.start(); }catch(e){} }
+    });
+    document.getElementById("nextBtn").addEventListener("click", nextWord);
+    document.getElementById("moreBtn").addEventListener("click", ()=> moreDlg.showModal());
+    document.getElementById("bankBtn").addEventListener("click", ()=> bankDlg.showModal());
+
+    // 更多選單
+    const moreDlg = document.getElementById("moreDlg");
+    document.getElementById("moreClose").addEventListener("click", ()=> moreDlg.close());
+    document.getElementById("reshuffleBtn").addEventListener("click", ()=>{ if(!currentBankKey) return; remaining = shuffle(currentBank.slice()); currentWord=""; nextWord(); });
+    document.getElementById("resetProgressBtn").addEventListener("click", ()=>{ if(!currentBankKey) return; remaining = shuffle(BANKS[currentBankKey].slice()); currentWord=""; nextWord(); });
+    document.getElementById("resetScoreBtn").addEventListener("click", ()=>{ if(!currentBankKey) return; if(!confirm("清空目前題庫分數？")) return; SCORES[currentBankKey]={correct:0, attempts:0}; save(LS_SCORES, SCORES); updateTop(); setHint("已清空分數"); });
+
+    // 題庫對話框
+    const bankDlg = document.getElementById("bankDlg");
+    document.getElementById("dlgClose").addEventListener("click", ()=> bankDlg.close());
+    const bankPills = document.getElementById("bankPills");
+    const bankNameInput = document.getElementById("bankNameInput");
+    const bankText = document.getElementById("bankText");
+    let selectedKeyForEdit = null;
+
+    function renderBankPills(){
+      bankPills.innerHTML = "";
+      Object.keys(BANKS).forEach(key=>{
+        const pill = document.createElement("button");
+        pill.className = "pill";
+        pill.textContent = NAMES[key] || key;
+        pill.addEventListener("click", ()=>{
+          // 切換題庫（立即生效）
+          setBank(key);
+          // 同步到編輯區
+          selectedKeyForEdit = key;
+          bankNameInput.value = NAMES[key] || key;
+          bankText.value = (BANKS[key]||[]).join(" ");
+        });
+        bankPills.appendChild(pill);
+      });
+      // 預設選中目前題庫
+      if(currentBankKey){
+        selectedKeyForEdit = currentBankKey;
+        bankNameInput.value = NAMES[currentBankKey] || currentBankKey;
+        bankText.value = (BANKS[currentBankKey]||[]).join(" ");
+      } else {
+        selectedKeyForEdit = null;
+        bankNameInput.value = "";
+        bankText.value = "";
+      }
+    }
+
+    document.getElementById("saveNameBtn").addEventListener("click", ()=>{
+      if(!selectedKeyForEdit) { alert("請先選擇題庫"); return; }
+      const newName = bankNameInput.value.trim() || selectedKeyForEdit;
+      NAMES[selectedKeyForEdit] = newName;
+      save(LS_NAMES, NAMES);
+      document.getElementById("bankBtn").textContent = "題庫：" + (NAMES[currentBankKey]||currentBankKey||"未選擇");
+      renderBankPills();
+    });
+
+    document.getElementById("saveBankBtn").addEventListener("click", ()=>{
+      if(!selectedKeyForEdit) { alert("請先選擇題庫"); return; }
+      const words = splitWords(bankText.value);
+      if(words.length===0){ alert("題庫不可為空"); return; }
+      BANKS[selectedKeyForEdit] = words;
+      save(LS_BANKS, BANKS);
+      if(currentBankKey===selectedKeyForEdit){ setBank(selectedKeyForEdit); }
+      renderBankPills();
+      setHint("已儲存內容");
+    });
+
+    document.getElementById("resetBankBtn").addEventListener("click", ()=>{
+      if(!selectedKeyForEdit) { alert("請先選擇題庫"); return; }
+      if(DEFAULT_BANKS[selectedKeyForEdit]){
+        BANKS[selectedKeyForEdit] = DEFAULT_BANKS[selectedKeyForEdit].slice();
+        save(LS_BANKS, BANKS);
+        bankText.value = BANKS[selectedKeyForEdit].join(" ");
+        if(currentBankKey===selectedKeyForEdit){ setBank(selectedKeyForEdit); }
+        renderBankPills();
+      } else {
+        alert("此題庫沒有預設內容");
+      }
+    });
+
+    document.getElementById("deleteBankBtn").addEventListener("click", ()=>{
+      if(!selectedKeyForEdit) { alert("請先選擇題庫"); return; }
+      if(!confirm("刪除此題庫？此動作無法復原。")) return;
+      delete BANKS[selectedKeyForEdit];
+      delete NAMES[selectedKeyForEdit];
+      delete SCORES[selectedKeyForEdit];
+      save(LS_BANKS, BANKS); save(LS_NAMES, NAMES); save(LS_SCORES, SCORES);
+      if(currentBankKey===selectedKeyForEdit){ currentBankKey=null; currentBank=[]; remaining=[]; currentWord=""; showWord("請選擇題庫"); }
+      selectedKeyForEdit=null; bankNameInput.value=""; bankText.value="";
+      renderBankPills(); updateTop();
+    });
+
+    document.getElementById("addBankBtn").addEventListener("click", ()=>{
+      const nm = document.getElementById("newBankName").value.trim();
+      if(!nm){ alert("請輸入題庫名稱"); return; }
+      const key = uuid();
+      BANKS[key]=["示範","詞語"]; NAMES[key]=nm;
+      save(LS_BANKS, BANKS); save(LS_NAMES, NAMES);
+      document.getElementById("newBankName").value="";
+      renderBankPills();
+    });
+
+    // ======== 初始化 ========
+    renderBankPills();
+    const saved = load(LS_PROGRESS, null);
+    if(saved && saved.key && BANKS[saved.key]){
+      currentBankKey = saved.key;
+      currentBank = BANKS[currentBankKey].slice();
+      remaining = Array.isArray(saved.remaining) && saved.remaining.every(w=>currentBank.includes(w)) ? saved.remaining.slice() : shuffle(currentBank.slice());
+      currentWord = saved.currentWord || "";
+      if(currentWord){ showWord("請說出：" + currentWord); } else { nextWord(); }
+    }
+    updateTop();
+  </script>
+</body>
+</html>
