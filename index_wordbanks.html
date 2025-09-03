@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>語詞練習遊戲（多語詞庫版）</title>
+  <style>
+    :root { --gap: 14px; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", Arial, "PingFang TC", "Microsoft JhengHei", sans-serif; 
+           text-align: center; padding: 40px 16px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    .subtitle { color:#666; margin-bottom: 20px; }
+    .bank-row, .controls { display:flex; gap: var(--gap); justify-content:center; flex-wrap: wrap; margin: 12px 0; }
+    button { font-size: 16px; padding: 10px 18px; border: 1px solid #ddd; border-radius: 10px; cursor: pointer; background: #fafafa; }
+    button.primary { background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    #word { font-size: 32px; margin: 18px 0; }
+    #status, #heard, #bankName { margin: 10px 0; font-size: 16px; }
+    #status { min-height: 24px; }
+    .ok { color: #16a34a; }
+    .bad { color: #dc2626; }
+    .muted { color: #6b7280; }
+    .card { max-width: 680px; margin: 0 auto; border:1px solid #eee; border-radius: 16px; padding: 18px; box-shadow: 0 6px 16px rgba(0,0,0,.06); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>語詞練習遊戲</h1>
+    <div class="subtitle">選擇語詞庫 → 按「開始錄音」→ 說出畫面顯示的詞語</div>
+
+    <div id="bankName" class="muted">目前語詞庫：尚未選擇</div>
+    <div class="bank-row">
+      <button id="btnG3">G3L1</button>
+      <button id="btnG4">G4L1</button>
+    </div>
+
+    <div id="word">請先選擇語詞庫</div>
+
+    <div class="controls">
+      <button id="nextBtn">下一題</button>
+      <button id="startBtn" class="primary">開始錄音</button>
+      <button id="stopBtn">停止錄音</button>
+    </div>
+
+    <div id="status" class="muted"></div>
+    <div id="heard" class="muted"></div>
+  </div>
+
+  <script>
+    // ======== 題庫定義 ========
+    const BANKS = {
+      G3L1: ["憂愁","禮讓","載人","灑水","小舟","文字","學習","練習","相似","口訣","忌妒","嘆氣"],
+      G4L1: ["耳朵","溜冰","一串","水珠","青蛙","游泳","煩惱","轉身","陀螺","緩慢","滑倒","老鷹"]
+    };
+
+    let currentBankKey = null;
+    let currentBank = [];
+    let currentWord = "";
+    let listening = false;
+
+    // ======== 工具函式 ========
+    function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+    // 正規化：移除中/西標點、空白、全形空白，並轉小寫（以防英數混雜情況）
+    function normalize(str){
+      if(!str) return "";
+      return str
+        .replace(/[\u3000\s]/g, "")                       // 空白與全形空白
+        .replace(/[。，．、；：？！…「」『』（）()【】《》〈〉“”"'`,.?!;:]/g, "") // 常見標點
+        .toLowerCase()
+        .trim();
+    }
+
+    function setBank(key){
+      currentBankKey = key;
+      currentBank = BANKS[key].slice(); // 複製一份
+      document.getElementById("bankName").innerText = "目前語詞庫：" + key;
+      document.getElementById("status").innerText = "";
+      newWord();
+    }
+
+    function newWord(){
+      if(!currentBank.length){
+        document.getElementById("word").innerText = "請先選擇語詞庫";
+        return;
+      }
+      currentWord = pickRandom(currentBank);
+      document.getElementById("word").innerText = "請說出：" + currentWord;
+      document.getElementById("status").innerText = "請按「開始錄音」並清楚念出詞語";
+      document.getElementById("status").className = "muted";
+      document.getElementById("heard").innerText = "";
+    }
+
+    // ======== Web Speech API 初始化 ========
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SpeechRecognition){
+      document.getElementById("status").innerText = "⚠️ 此瀏覽器不支援語音辨識，請改用 Chrome 或 Edge。";
+    }
+    const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+    if(recognition){
+      recognition.lang = "zh-TW";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        listening = true;
+        document.getElementById("status").innerText = "🎤 錄音中…請念出詞語";
+        document.getElementById("status").className = "muted";
+      };
+
+      recognition.onresult = (event) => {
+        const raw = event.results[0][0].transcript || "";
+        const transcript = normalize(raw);
+        const target = normalize(currentWord);
+
+        document.getElementById("heard").innerText = "我聽到你說：「" + raw + "」";
+
+        if (transcript === target && target.length > 0){
+          document.getElementById("status").innerText = "✅ 太棒了！答對了！";
+          document.getElementById("status").className = "ok";
+        } else {
+          document.getElementById("status").innerText = "❌ 再試一次！";
+          document.getElementById("status").className = "bad";
+        }
+      };
+
+      recognition.onerror = (event) => {
+        document.getElementById("status").innerText = "⚠️ 錯誤：" + event.error;
+        document.getElementById("status").className = "bad";
+      };
+
+      recognition.onend = () => {
+        listening = false;
+      };
+    }
+
+    // ======== 事件綁定 ========
+    document.getElementById("btnG3").addEventListener("click", () => setBank("G3L1"));
+    document.getElementById("btnG4").addEventListener("click", () => setBank("G4L1"));
+
+    document.getElementById("nextBtn").addEventListener("click", () => {
+      newWord();
+    });
+
+    document.getElementById("startBtn").addEventListener("click", () => {
+      if(!recognition){ return; }
+      if(!currentBankKey){
+        document.getElementById("status").innerText = "請先選擇語詞庫（G3L1 或 G4L1）";
+        document.getElementById("status").className = "bad";
+        return;
+      }
+      if(!listening){
+        try { recognition.start(); } catch(e){ /* 防止快速連點錯誤 */ }
+      }
+    });
+
+    document.getElementById("stopBtn").addEventListener("click", () => {
+      if(recognition && listening){
+        try { recognition.stop(); } catch(e){}
+      }
+    });
+  </script>
+</body>
+</html>
