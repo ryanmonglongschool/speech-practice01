@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>語詞練習遊戲</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 50px; }
+    #word { font-size: 2em; margin: 20px; }
+    #result { font-size: 1.5em; margin: 20px; color: blue; }
+    button { font-size: 1.2em; padding: 10px 20px; }
+  </style>
+</head>
+<body>
+  <h1>語詞練習遊戲</h1>
+  <div id="word"></div>
+  <button id="startBtn">開始錄音</button>
+  <div id="result"></div>
+
+  <script>
+    const words = ["青蛙", "耳朵", "溜冰", "水珠", "游泳"]; // 題庫
+    let currentWord = "";
+
+    function newWord() {
+      currentWord = words[Math.floor(Math.random() * words.length)];
+      document.getElementById("word").innerText = "請說出：" + currentWord;
+      document.getElementById("result").innerText = "";
+    }
+
+    // 初始化語音辨識
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-TW"; // 中文（台灣）
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.trim();
+      if (transcript === currentWord) {
+        document.getElementById("result").innerText = "✅ 太棒了！答對了！";
+      } else {
+        document.getElementById("result").innerText = "❌ 你說的是：「" + transcript + "」，再試一次！";
+      }
+      setTimeout(newWord, 2000); // 2 秒後換下一題
+    };
+
+    recognition.onerror = (event) => {
+      document.getElementById("result").innerText = "⚠️ 錯誤：" + event.error;
+    };
+
+    document.getElementById("startBtn").onclick = () => {
+      recognition.start();
+    };
+
+    // 第一次載入顯示詞語
+    newWord();
+  </script>
+</body>
+</html>
